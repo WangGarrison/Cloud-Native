@@ -139,6 +139,15 @@ docker images
 
 # 删除某个镜像
 docker rmi 镜像名
+
+# 查看容器运行日志
+docker logs 容器名/id
+
+# 进入到某一容器的控制台
+docker exec -it 容器名 /bin/bash
+
+# 复制文件
+docker cp 源路径 目标路径  #容器内的文件，可以用id指定：容器id:路径   
 ```
 
 容器（运行中的程序）相关命令：
@@ -276,9 +285,31 @@ docker push 15691177603/wangnginx:v1.0
 
 ## 2.8 挂载
 
-## T17
+挂载：将容器内部的一个目录与大主机的一个目录建立起关系，使得在外部主机操作该目录的东西就像在容器内操作该目录的东西
 
+<img align='left' src="img/%E4%BA%91%E5%8E%9F%E7%94%9F%E3%80%81%E5%AE%B9%E5%99%A8%E3%80%81k8s.img/image-20211107230403114.png" alt="image-20211107230403114" style="zoom:50%;" />
 
+```shell
+docker run \
+--name=mynginx -d \
+-p 88:80 \
+-v data/html:/usr/share/nginx/html:ro nginx  #将主机的data/html目录挂载到容器的/usr/share/nginx/html，:ro表示只读，即容器内只可以读，只有外部主机可修改
+
+# 挂载好之后，修改页面直接到主机的目录下修改就可以了，很nice
+```
+
+## 2.9 自己编写应用部署
+
+启动redis
+
+```shell
+docker run \
+-d --name=myredis \
+-p 6379:6379 \
+redis:latest redis-server /etc/redis/redis.conf
+```
+
+# T21
 
 # 附录：术语
 
