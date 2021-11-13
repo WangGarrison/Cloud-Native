@@ -127,7 +127,7 @@ Docker基本术语：
 ![image-20211107180424107](img/%E4%BA%91%E5%8E%9F%E7%94%9F.img/image-20211107180424107.png)
 
 ```shell
-# docker 启动
+# docker 启动  
 systemctl enable docker --now 
 
 # 查看docker版本信息
@@ -380,23 +380,93 @@ Kubernetes Cluste(集群)r = N master node + N worker node  （N主节点 + N工
 
 ## 3.2 K8s安装方式
 
-先装个kubelet厂长，再装个kubectl，用kubeadm工具先init一个主节点，再用kubeadm join加入其他的节点
+先装个kubelet厂长，再装个kubectl(命令工具)，用kubeadm工具(集群工具)先init一个主节点，再用kubeadm join加入其他的节点
 
 <img align='left' src="img/%E4%BA%91%E5%8E%9F%E7%94%9F%E3%80%81%E5%AE%B9%E5%99%A8%E3%80%81k8s.img/image-20211111161236354.png" alt="image-20211111161236354" style="zoom:33%;" />
 
 
 
-# T32
+**安装kubeadm**
+
+- 一台兼容的 Linux 主机。Kubernetes 项目为基于 Debian 和 Red Hat 的 Linux 发行版以及一些不提供包管理器的发行版提供通用的指令
+- 每台机器 2 GB 或更多的 RAM （如果少于这个数字将会影响你应用的运行内存)
+
+- 2 CPU 核或更多
+- 集群中的所有机器的网络彼此均能相互连接(公网和内网都可以)
+
+- - **设置防火墙放行规则**
+
+- 节点之中不可以有重复的主机名、MAC 地址或 product_uuid。请参见[这里](https://kubernetes.io/zh/docs/setup/production-environment/tools/kubeadm/install-kubeadm/#verify-mac-address)了解更多详细信息。
+
+- - **设置不同hostname**
+
+- 开启机器上的某些端口。请参见[这里](https://kubernetes.io/zh/docs/setup/production-environment/tools/kubeadm/install-kubeadm/#check-required-ports) 了解更多详细信息。
+
+- - **内网互信**
+
+- 禁用交换分区。为了保证 kubelet 正常工作，你 **必须** 禁用交换分区。
+
+- - **永久关闭**
+
+**所有机器配置k8s官方要求的配置**
+
+```bash
+#各个机器设置自己的域名
+hostnamectl set-hostname xxxx
+
+
+# 将 SELinux 设置为 permissive 模式（相当于将其禁用）
+sudo setenforce 0
+sudo sed -i 's/^SELINUX=enforcing$/SELINUX=permissive/' /etc/selinux/config
+
+#关闭swap
+swapoff -a  
+sed -ri 's/.*swap.*/#&/' /etc/fstab
+
+#允许 iptables 检查桥接流量
+cat <<EOF | sudo tee /etc/modules-load.d/k8s.conf
+br_netfilter
+EOF
+
+cat <<EOF | sudo tee /etc/sysctl.d/k8s.conf
+net.bridge.bridge-nf-call-ip6tables = 1
+net.bridge.bridge-nf-call-iptables = 1
+EOF
+
+# 刷新系统配置
+sudo sysctl --system
+```
+
+**安装kubelet(厂长)、kubeadm(集群工具)、kubectl(命令工具)**
+
+[ubuntu安装k8s](https://www.jianshu.com/p/f2d4dd4d1fb1)
+
+kubelet 现在每隔几秒就会重启，因为它陷入了一个等待 kubeadm 指令的死循环
+
+**使用kubeadm引导集群**
+
+初始化master节点 -> 部署网络插件 -> master节点reday -> 工作节点join
+
+**可以再部署一个可视化界面：dashboard**
+
+## 3.3 k8s命令
+
+> Docker把运行中的应用叫容器，k8s中叫pods 
+
+```shell
+#查看集群所有节点
+kubectl get nodes
+
+#根据配置文件，给集群创建资源
+kubectl apply -f xxx.yaml
+
+#查看集群部署了哪些应用
+kubectl get pods -A 
+```
 
 
 
-
-
-
-
-
-
-
+# T41
 
 
 
@@ -487,6 +557,46 @@ reboot
 ```shell
 scp 要传输的文件 目标机器路径  #目标机器 用户名@ip:路径
 ```
+
+查看当前linux主机名字
+
+```shell
+hostname
+```
+
+设置linux主机名
+
+```shell
+hostnamectl set-hostname 新名字
+```
+
+刷新linux系统配置
+
+```shell
+sudo sysctl --system
+```
+
+检查应用状态
+
+```shell
+systemctl status 应用名
+```
+
+查看linux命令历史
+
+```shell
+history
+```
+
+定时查看状态
+
+```shell
+watch -n 1 ps -elf #在命令前加watch -n 1，1表示每隔一秒查看一次
+```
+
+
+
+
 
 # 扩展：金丝雀/灰度/Canary部署
 
