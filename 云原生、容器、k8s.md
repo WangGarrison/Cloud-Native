@@ -464,29 +464,179 @@ kubectl apply -f xxx.yaml
 kubectl get pods -A 
 ```
 
+## 3.4 NameSpace
 
+名称空间，用来对集群资源进行隔离划分。默认只隔离资源，不隔离网络
 
-# T41
+<img align='left' src="img/%E4%BA%91%E5%8E%9F%E7%94%9F%E3%80%81%E5%AE%B9%E5%99%A8%E3%80%81k8s.img/image-20211116150427422.png" alt="image-20211116150427422" style="zoom:30%;" />
 
+```shell
+#创建命名空间
+kubectl create ns helllo
 
+#删除命名空间
+kubectl delete ns hello
+```
 
+使用配置文件也可以创建namespace：
 
+新建一个yaml文件
 
+```yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: hello
+```
 
+使用命令 `kubectl apply -f hello.yaml` 执行配置文件的内容，hello命名空间就创建好了；要删除的话，执行命令：`kubectl delete -f hello.yaml`
 
+## 3.5 Pod
 
+pod是k8s管理的最小单位，pod里面可运行容器（pod像一个宿舍，里面住着一些打工仔(容器))
 
+一个pod里面可以运单个容器或多个容器，建议是单个容器
 
+<img align='left' src="img/%E4%BA%91%E5%8E%9F%E7%94%9F%E3%80%81%E5%AE%B9%E5%99%A8%E3%80%81k8s.img/image-20211116152652875.png" alt="image-20211116152652875" style="zoom:33%;" />
 
+```shell
+kubectl run mynginx --image=nginx  #启动一个pod，里面是nginx容器
 
+kubectl get pod  #查看默认命名空间的pod，等价于 kubectl get pod -n default
 
+kubectl get pod -A #查看所有命名空间的pod
 
+kubectl describe pod pod名字   #查看指定pod的详细描述信息
 
+# 每个pod，k8s都会给分配一个ip，集群中的任意一个机器都能通过Pod分配的ip来访问这个pod
+kubectl get pod -o wide  #查看pod运行时ip与状态，-owide可以连着写
 
+curl 192.168.169.136 #访问ip的默认端口
 
+kubectl logs pod名  #查看pod运行日志
 
+kubectl logs -f pod名  #阻塞式追踪pod日志，即当前shell阻塞，有新日志就会继续显示出来
 
+kubectl delete pod mynginx #删除默认名称空间的pod，-n default
 
+#进入到pod内部的bash控制台
+kubectl exec -it mynginx -- /bin/bash
+```
+
+使用配置文件创建pod：
+
+`vi pod.yaml`
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata: 
+  labels:
+    run: mynginx
+  name: mynginx
+  namespace: default
+spec:
+  containers:
+  - image: nginx
+    name: mynginx
+```
+
+`kubectl apply -f pod.yaml`
+
+通过配置文件删除pod：`kubectl delete -f pod.yaml`
+
+也可在可视化界面通过点击来创建pod
+
+**pod里面运行两个容器示例：（一个宿舍里面住了两个打工仔）**
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    run: myapp
+  name: myapp
+spec:
+  containers:
+  - image: nginx
+    name: nginx
+  - image: tomcat:8.5.68
+    name: tomcat
+```
+
+<img align='left' src="img/%E4%BA%91%E5%8E%9F%E7%94%9F%E3%80%81%E5%AE%B9%E5%99%A8%E3%80%81k8s.img/image-20211121120358256.png" alt="image-20211121120358256" style="zoom:50%;" />
+
+通过ip+端口号可以访问到不同的容器：nginx运行在80端口，tomcat运行在8080端口
+
+<img align='left' src="img/%E4%BA%91%E5%8E%9F%E7%94%9F%E3%80%81%E5%AE%B9%E5%99%A8%E3%80%81k8s.img/image-20211121121119343.png" alt="image-20211121121119343" style="zoom:40%;" />
+
+注意：两个应用不能共用一个端口，这样操作会让一个启动失败
+
+<img align='left' src="img/%E4%BA%91%E5%8E%9F%E7%94%9F%E3%80%81%E5%AE%B9%E5%99%A8%E3%80%81k8s.img/image-20211121123746861.png" alt="image-20211121123746861" style="zoom:50%;" />
+
+## 3.6 Deployment
+
+控制Pod，使Pod拥有==多副本，自愈、扩缩容能力==
+
+自愈能力：使用deployment部署的应用，使用kubectl delete删除应用，会自动重启该应用，要真删得删deployment
+
+```shell
+# 清除所有Pod，比较下面两个命令有何不同效果？
+kubectl run mynginx --image=nginx
+
+kubectl create deployment mytomcat --image=tomcat:8.5.68
+
+# 自愈能力: 使用deployment部署的应用，使用kubectl delete删除应用，会自动重启该应用，要真删得删deployment
+```
+
+**Deployment的多副本功能**
+
+<img align='left' src="img/%E4%BA%91%E5%8E%9F%E7%94%9F%E3%80%81%E5%AE%B9%E5%99%A8%E3%80%81k8s.img/image-20211121133128829.png" alt="image-20211121133128829" style="zoom:40%;" />
+
+```shell
+kubectl create deployment my-dep --image=nginx --replicas=3
+```
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: my-dep
+  name: my-dep
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: my-dep
+  template:
+    metadata:
+      labels:
+        app: my-dep
+    spec:
+      containers:
+      - image: nginx
+        name: nginx
+```
+
+**Deployment扩缩容功能**
+
+```shell
+kubectl scale deploy/my-dep --replicas=5  #由1个扩容到5个
+kubectl scale deploy/my-dep --replicas=2  #由5个缩容到2个
+
+#这就很像一些电商节，流量高峰期需要扩容，过后需要缩容
+```
+
+![image-20211121133439767](img/%E4%BA%91%E5%8E%9F%E7%94%9F%E3%80%81%E5%AE%B9%E5%99%A8%E3%80%81k8s.img/image-20211121133439767.png)
+
+**Deployment的自愈&故障转移**
+
+自愈：异常下线，自动重启
+
+故障转移：一个结点宕机，将坏结点的pod转移到别的结点上。（故障pod的信息会实时通过APIServer存储到etcd里面，如果宕机了，会重新读取etcd里面的内容来达到故障转移）
+
+# T51
 
 
 
