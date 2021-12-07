@@ -340,7 +340,7 @@ Java为例
 
 
 
-随着容器化的到来，又带来了新的问题：部署了很多容器，怎么管理？由此引进了容器的编排管理工具—Kubernetes
+随着容器化的到来，又带来了新的问题：部署了很多容器，怎么管理？由此引进了==容器的编排管理工具—Kubernetes==
 
 Kubernetes：全称kubernetes，即k8s(k和s中间有8个字母)，为容器服务而生的一个可移植容器的编排管理工具
 
@@ -574,7 +574,7 @@ spec:
 
 <img align='left' src="img/%E4%BA%91%E5%8E%9F%E7%94%9F%E3%80%81%E5%AE%B9%E5%99%A8%E3%80%81k8s.img/image-20211121123746861.png" alt="image-20211121123746861" style="zoom:50%;" />
 
-## 3.6 Deployment
+## 3.6 Deployment（工作负载）
 
 控制Pod，使Pod拥有==多副本，自愈、扩缩容能力==
 
@@ -636,7 +636,147 @@ kubectl scale deploy/my-dep --replicas=2  #由5个缩容到2个
 
 故障转移：一个结点宕机，将坏结点的pod转移到别的结点上。（故障pod的信息会实时通过APIServer存储到etcd里面，如果宕机了，会重新读取etcd里面的内容来达到故障转移）
 
-# T51
+**滚动更新**
+
+![image-20211204095609875](img/%E4%BA%91%E5%8E%9F%E7%94%9F%E3%80%81%E5%AE%B9%E5%99%A8%E3%80%81k8s.img/image-20211204095609875.png)
+
+先启动一个v2版本的绿色Pod，等它运行成功了，把v1版本的Pod替换掉，全程不需要停机（启动一个新的后，再杀死一个老的，这样一个个挨个去升级，这就称为滚动更新）
+
+```shell
+kubectl set image deployment/my-dep nginx=nginx:1.16.1 --record
+kubectl rollout status deployment/my-dep
+
+# 修改
+kubectl edit deployment/my-dep
+```
+
+**版本回退**
+
+```SHELL
+#历史记录
+kubectl rollout history deployment/my-dep
+
+#查看某个历史详情
+kubectl rollout history deployment/my-dep --revision=2
+
+#回滚（回到上次）
+kubectl rollout undo deployment/my-dep
+
+#回滚（回到指定版本）
+kubectl rollout undo deployment/my-dep --to-revision=2
+```
+
+版本回退也是一个滚动更新的过程
+
+> 除了Deployment，k8s还有StatefulSet、DaemonSet、Job等类型资源。都称为工作负载，有状态应使用StatefulSet部署，无状态应使用Deployment部署
+>
+> 在k8s中，不直接布置pod，虽然说pod才是应用的载体，但是一般都是使用如下图这些工作负载来控制pod的
+>
+> ![image-20211204102113141](img/%E4%BA%91%E5%8E%9F%E7%94%9F%E3%80%81%E5%AE%B9%E5%99%A8%E3%80%81k8s.img/image-20211204102113141.png)
+
+## 3.7 Service（服务发现）
+
+==Service：将一组pods公开为网络服务的抽象方法==，具有服务发现和负载均衡的功能
+
+Service的ClusterIP模式如下图，在集群内可以通过Service暴露的ip/域名来访问：
+
+![image-20211204112601412](img/%E4%BA%91%E5%8E%9F%E7%94%9F%E3%80%81%E5%AE%B9%E5%99%A8%E3%80%81k8s.img/image-20211204112601412.png)
+
+```shell
+kubectl expose deploy my-dep --port=8000 --target-port=80  --type=ClusterIP
+```
+
+**Service-NodePort模式**（集群外也可以访问）
+
+```shell
+kubectl expose deploy my-dep --port=8000 --target-port=80  --type=NodePort
+```
+
+![image-20211204113154839](img/%E4%BA%91%E5%8E%9F%E7%94%9F%E3%80%81%E5%AE%B9%E5%99%A8%E3%80%81k8s.img/image-20211204113154839.png)
+
+## 3.8 Ingress统一网关入口
+
+> service是为一组pod服务提供一个统一集群内访问入口或外部访问的随机端口，而ingress做的是通过反射的形式对请求分发到对应的service上（==service是pod的入口，ingress是service的上层入口==）
+>
+> 引入ingress的原因：service是很多的，入口不统一的话不方便管理
+
+Ingress：service的统一网关入口
+
+![image-20211204115445393](img/%E4%BA%91%E5%8E%9F%E7%94%9F%E3%80%81%E5%AE%B9%E5%99%A8%E3%80%81k8s.img/image-20211204115445393.png)
+
+> Ingress有一些高级用法：路径重写、流量限制等
+
+## 3.9存储抽象
+
+把挂载的统一抽象到存储层，
+
+![image-20211205121540502](img/%E4%BA%91%E5%8E%9F%E7%94%9F%E3%80%81%E5%AE%B9%E5%99%A8%E3%80%81k8s.img/image-20211205121540502.png)
+
+PV：Persistent Volume持久卷（真正存数据的），将应用需要的持久化的数据保存到指定的地方
+
+PVC：Persistent Volume Claim 持久卷声明（场地声明书），声明需要使用的持久卷的规格
+
+![image-20211206105447344](img/%E4%BA%91%E5%8E%9F%E7%94%9F%E3%80%81%E5%AE%B9%E5%99%A8%E3%80%81k8s.img/image-20211206105447344.png)
+
+挂载目录用PV、PVC
+
+挂载配置文件用Config Map
+
+## 3.10 Secret
+
+Secret对象类型用来保存敏感信息，例如密码、OAuth令牌和SSH密钥。将这些信息放在Secret中更安全
+
+
+
+# 4 KubeSphere
+
+KubeSphere：是==基于 Kubernetes== 构建的分布式、多租户、多集群、企业级==开源容器平台==，具有强大且完善的网络与存储能力，并通过极简的人机交互提供完善的多集群管理、CI / CD 、微服务治理、应用管理等功能，帮助企业在云、虚拟化及物理机等异构基础设施上快速构建、部署及运维容器架构，实现应用的敏捷开发与全生命周期管理。
+
+
+
+## 4.1 Linux单节点部署KubeSphere
+
+> 还有多节点部署的教程，我实战的是这篇单节点部署
+
+1、开通服务器，服务器防火墙放行30000~32767
+
+![image-20211207104436651](img/%E4%BA%91%E5%8E%9F%E7%94%9F%E3%80%81%E5%AE%B9%E5%99%A8%E3%80%81k8s.img/image-20211207104436651.png)
+
+2、[在 Linux 上以 All-in-One 模式安装 KubeSphere](https://kubesphere.com.cn/docs/quick-start/all-in-one-on-linux/)
+
+# T74
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -758,3 +898,9 @@ watch -n 1 ps -elf #在命令前加watch -n 1，1表示每隔一秒查看一次
 - 金丝雀发布指的是在生产环境中分阶段逐步更新后端应用的版本（需要具备流量控制能力），==在小范围验证符合预期之后，再推广至整个生产环境==。
 - 金丝雀发布的好处：可以用真实环境测试新版本，当新版本存在问题时最多只影响部分用户，且支持安全快速的回滚策略（将路由到新版本上的流量切换到其他老版本机器上即可）。
 - 蓝绿部署是准备两套系统，在两套系统之间进行切换；金丝雀策略是只有一套系统，逐渐替换这套系统
+
+# 扩展：Yaml
+
+Yaml：**YAML**（/ˈjæməl/，尾音类似*camel*骆驼）是一个可读性高，用来表达资料序列化序列化)的格式。多用于配置文件
+
+*YAML*是"YAML Ain't a Markup Language"（YAML不是一种标记语言标记语言)）的递归缩写。在开发的这种语言时，*YAML* 的意思其实是：=="Yet Another Markup Language"（仍是一种标记语言）==，但为了强调这种语言以数据做为中心，而不是以标记语言为重点，而用反向缩略语重命名。
